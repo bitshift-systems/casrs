@@ -1,0 +1,5 @@
+# Default codeowner is the Engineering team
+* @bitshift-systems/engineering
+
+# Engineering Admins are required to approve changes to CODEOWNERS
+/.github/CODEOWNERS @bitshift-systems/engineering-admins
