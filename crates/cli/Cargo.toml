@@ -1,0 +1,20 @@
+[package]
+name = "casrs-cli"
+description = "casrs management CLI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "casrs"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
