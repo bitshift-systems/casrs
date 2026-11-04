@@ -2,15 +2,79 @@
 rust = "1.99.1"
 hk = { version = "2.11.0", workflow = "release.yml" }
 oxfmt = "0.75.0"
-jactionlint = { version = "2.4.0", workflow = "release.yaml" }
+jactionlint = "2.4.0"
 shellcheck = "0.11.0"
 
 "aqua:EmbarkStudios/cargo-deny" = "0.20.2"
 "aqua:nextest-rs/nextest/cargo-nextest" = "0.9.146"
+"packslip:jdx/jactionlint" = "2.4.0"
 
 [hooks]
 postinstall = "hk install --mise"
 
+[tasks.rust-components]
+description = "Install Rust components required by project tasks"
+run = "rustup component add rustfmt clippy"
+
+[tasks.build]
+description = "Compile the whole workspace (debug, locked deps)"
+run = "cargo build --workspace --locked"
+
+[tasks.build-release]
+description = "Compile the release binaries we ship (server, cli)"
+run = "cargo build --release --locked -p casrs-server -p casrs-cli"
+
 [tasks.audit]
 description = "Supply-chain + license audit"
 run = "cargo deny check"
+
+[tasks.test]
+description = "Hermetic test suite: unit + serde + validation; also compile-checks feature-gated targets"
+run = "cargo nextest run --workspace --locked"
+
+[tasks.test-archive]
+description = "Build the workspace ONCE (--all-features) and pack its tests into nextest archives under target/nextest/ (what CI's test jobs and e2e shards run)"
+run = '''
+set -eu
+mkdir -p target/nextest
+cargo nextest archive --workspace --all-features --locked --archive-file target/nextest/workspace.tar.zst
+'''
+
+[tasks.test-from-archive]
+description = "Run the hermetic suite from the archive `test-archive` built (no compile, no doctests)"
+run = '''
+cargo-nextest nextest run --profile ci --workspace-remap . \
+  --archive-file target/nextest/workspace.tar.zst \
+  --no-tests pass \
+  -E 'not binary(/^integration/)'
+'''
+
+[tasks.test-int-from-archive]
+description = "Run the integration tests from the archive `test-archive` built"
+run = '''
+cargo-nextest nextest run --profile ci --workspace-remap . \
+  --archive-file target/nextest/workspace.tar.zst \
+  --no-tests pass \
+  --run-ignored all -E 'binary(/^integration/)'
+'''
+
+[tasks.clippy]
+description = "Clippy across the workspace incl. feature-gated targets, warnings are errors"
+run = "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings"
+
+[tasks.fmt]
+description = "Format the workspace in place"
+run = "cargo fmt --all"
+
+[tasks.fmt-check]
+description = "Verify formatting without changing files (CI gate)"
+run = "cargo fmt --all -- --check"
+
+[tasks.ci]
+description = "The full local gate: the hermetic Rust suite"
+depends = [
+  "fmt-check",
+  "clippy",
+  "build",
+  "test",
+]

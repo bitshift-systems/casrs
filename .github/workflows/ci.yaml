@@ -42,9 +42,138 @@ jobs:
         uses: bitshift-systems/.github/actions/setup-repo@50b88cc93d8640157770512ec9e11750d6c06a31 # setup-repo-v2.2.0
         with:
           cache-key: audit
+          install-args: rust aqua:EmbarkStudios/cargo-deny hk
 
       - name: Run Audit
         run: mise run audit
+
+  rust-lint:
+    if: >-
+      ${{ !(startsWith(github.head_ref, 'release-please--')
+      && github.event.pull_request.head.repo.full_name == github.repository) }}
+    name: Rust Lint
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Repo
+        uses: bitshift-systems/.github/actions/setup-repo@50b88cc93d8640157770512ec9e11750d6c06a31 # setup-repo-v2.2.0
+        with:
+          cache-key: lint
+
+      - name: Install Rust components
+        run: mise run rust-components
+
+      - name: Check formatting
+        run: mise run fmt-check
+
+      - name: Run linter
+        run: mise run clippy
+
+      - name: Run doctests
+        run: cargo test --doc --workspace --all-features --locked
+
+  rust-build:
+    if: >-
+      ${{ !(startsWith(github.head_ref, 'release-please--')
+      && github.event.pull_request.head.repo.full_name == github.repository) }}
+    name: Rust Build
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Repo
+        uses: bitshift-systems/.github/actions/setup-repo@50b88cc93d8640157770512ec9e11750d6c06a31 # setup-repo-v2.2.0
+        with:
+          cache-key: build
+          install-args: rust aqua:nextest-rs/nextest/cargo-nextest hk
+
+      - name: Build and archive tests
+        run: mise run test-archive
+
+      - name: Upload workspace tests
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nextest-workspace
+          path: target/nextest/workspace.tar.zst
+          retention-days: 1
+          compression-level: 0
+
+  rust-test:
+    if: >-
+      ${{ !(startsWith(github.head_ref, 'release-please--')
+      && github.event.pull_request.head.repo.full_name == github.repository) }}
+    name: Rust Test
+    needs:
+      - rust-build
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Repo
+        uses: bitshift-systems/.github/actions/setup-repo@50b88cc93d8640157770512ec9e11750d6c06a31 # setup-repo-v2.2.0
+        with:
+          cache-key: build
+          install-args: aqua:nextest-rs/nextest/cargo-nextest hk
+
+      - name: Download tests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nextest-workspace
+          path: target/nextest
+
+      - name: Run unit tests
+        run: mise run test-from-archive
+
+  integration-test:
+    if: >-
+      ${{ !(startsWith(github.head_ref, 'release-please--')
+      && github.event.pull_request.head.repo.full_name == github.repository) }}
+    name: Integration Test
+    needs:
+      - rust-build
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Repo
+        uses: bitshift-systems/.github/actions/setup-repo@50b88cc93d8640157770512ec9e11750d6c06a31 # setup-repo-v2.2.0
+        with:
+          cache-key: build
+          install-args: aqua:nextest-rs/nextest/cargo-nextest hk
+
+      - name: Download tests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nextest-workspace
+          path: target/nextest
+
+      - name: Run unit tests
+        run: mise run test-int-from-archive
 
   workflow-lint:
     if: >-
@@ -69,6 +198,9 @@ jobs:
     name: Build Success
     needs:
       - cargo-audit
+      - rust-lint
+      - rust-test
+      - integration-test
       - workflow-lint
     runs-on: ubuntu-26.04
     timeout-minutes: 10
