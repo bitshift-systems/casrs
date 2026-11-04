@@ -38,7 +38,7 @@ jobs:
           persist-credentials: false
 
       - name: Lint workflows
-        uses: bitshift-systems/.github/actions/workflow-lint@50b88cc93d8640157770512ec9e11750d6c06a31 # workflow-lint-v2.0.0
+        uses: bitshift-systems/.github/actions/workflow-lint@a873c98baeea43f21c2de91bdeb6cd24e13022e3 # workflow-lint-v2.0.0
 
   status:
     if: ${{ !cancelled() }}
