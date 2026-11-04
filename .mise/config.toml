@@ -1,6 +1,6 @@
 [tools]
 rust = "1.99.1"
-hk = { version = "2.8.0", workflow = "release.yml" }
+hk = { version = "2.11.0", workflow = "release.yml" }
 oxfmt = "0.75.0"
 jactionlint = { version = "2.4.0", workflow = "release.yaml" }
 shellcheck = "0.11.0"
