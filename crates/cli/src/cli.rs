@@ -20,4 +20,6 @@ pub struct GlobalArgs {
 }
 
 #[derive(clap::Subcommand, Debug)]
-pub enum Command {}
+pub enum Command {
+    Noop,
+}

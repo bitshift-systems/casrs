@@ -1,4 +1,5 @@
-use casrs_cli::consts;
+//! The `casrs` management client binary.
+
 use clap::Parser;
 
 fn main() -> std::process::ExitCode {
