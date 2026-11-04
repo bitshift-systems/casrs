@@ -44,19 +44,6 @@ impl OtlpConfig {
 
         Ok(Some(OtlpConfig { endpoint }))
     }
-
-    /// Resolve OTLP config, honoring strict mode. On a non-strict config error
-    /// this logs the actionable message and returns `Ok(None)` (degrade);
-    /// strict mode propagates the error so the binary can fail-fast.
-    fn resolve() -> Result<Option<Self>, TelemetryError> {
-        match Self::from_env() {
-            Ok(opt) => Ok(opt),
-            Err(e) => {
-                tracing::error!(error = %e, "OTLP config is invalid; OTLP export is off, local logs and metrics still work");
-                Ok(None)
-            }
-        }
-    }
 }
 
 fn resource(service_name: &str) -> Resource {
