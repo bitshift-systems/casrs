@@ -176,7 +176,10 @@ specifiers = ["0.75.0"]
 [[tools."packslip:jdx/jactionlint"]]
 version = "2.4.0"
 backend = "packslip:jdx/jactionlint"
-specifiers = ["latest"]
+specifiers = [
+    "2.4.0",
+    "latest",
+]
 
 [tools."packslip:jdx/jactionlint"."platforms.linux-arm64"]
 checksum = "sha256:42413391c248f99ff4550d6c866ee717d5ea4ca2b966d9d54ad1503af955e22f"
