@@ -1,11 +1,23 @@
+use tokio::net::TcpListener;
+
+mod router;
+
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let _telemetry = casrs_telemetry::init_tracing("casrs-server")?;
 
     tracing::info!("starting casrs-server");
 
-    tokio::select! {
-        _ = shutdown_signal() => tracing::info!("shutdown signal received, exiting"),
-    }
+    let router = router::router();
+
+    let listener = TcpListener::bind("0.0.0.0:8000").await.inspect_err(|e| {
+        tracing::error!(?e, "failed to bind to address");
+    })?;
+    tracing::info!(addr = ?listener.local_addr()?, "server listening");
+
+    axum::serve(listener, router)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
+
     Ok(())
 }
 
