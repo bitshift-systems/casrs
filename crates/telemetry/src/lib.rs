@@ -1,8 +1,69 @@
 pub mod env;
 mod error;
 
-pub use error::TelemetryError;
-use opentelemetry_sdk::{logs::SdkLoggerProvider, trace::SdkTracerProvider};
+pub use error::{Signal, TelemetryError};
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::{Resource, logs::SdkLoggerProvider, trace::SdkTracerProvider};
+
+/// Resolved OTLP configuration. Absent when `OTEL_EXPORTER_OTLP_ENDPOINT` is
+/// unset — the operator then runs fully offline (fmt logs + Prometheus pull).
+#[derive(Debug, Clone)]
+pub struct OtlpConfig {
+    /// The collector endpoint (validated as a URL).
+    pub endpoint: String,
+}
+
+impl OtlpConfig {
+    /// Read + validate OTLP config from the standard `OTEL_*` env.
+    ///
+    /// - `Ok(None)` — `OTEL_EXPORTER_OTLP_ENDPOINT` unset: OTLP disabled.
+    /// - `Ok(Some)` — endpoint present and valid.
+    /// - `Err` — endpoint set but malformed, or an unsupported protocol
+    ///   requested. Callers degrade (log + continue) unless strict.
+    pub fn from_env() -> Result<Option<Self>, TelemetryError> {
+        let endpoint = match std::env::var(env::OTEL_EXPORTER_OTLP_ENDPOINT) {
+            Ok(v) if !v.trim().is_empty() => v,
+            _ => return Ok(None),
+        };
+
+        // Only gRPC is compiled in; reject other protocols with a clear fix.
+        if let Ok(proto) = std::env::var(env::OTEL_EXPORTER_OTLP_PROTOCOL) {
+            let proto = proto.trim();
+            if !proto.is_empty() && !proto.eq_ignore_ascii_case("grpc") {
+                return Err(TelemetryError::UnsupportedProtocol {
+                    value: proto.to_string(),
+                });
+            }
+        }
+
+        url::Url::parse(&endpoint).map_err(|source| TelemetryError::InvalidOtlpEndpoint {
+            value: endpoint.clone(),
+            source,
+        })?;
+
+        Ok(Some(OtlpConfig { endpoint }))
+    }
+
+    /// Resolve OTLP config, honoring strict mode. On a non-strict config error
+    /// this logs the actionable message and returns `Ok(None)` (degrade);
+    /// strict mode propagates the error so the binary can fail-fast.
+    fn resolve() -> Result<Option<Self>, TelemetryError> {
+        match Self::from_env() {
+            Ok(opt) => Ok(opt),
+            Err(e) => {
+                tracing::error!(error = %e, "OTLP config is invalid; OTLP export is off, local logs and metrics still work");
+                Ok(None)
+            }
+        }
+    }
+}
+
+fn resource(service_name: &str) -> Resource {
+    Resource::builder()
+        .with_service_name(service_name.to_string())
+        .build()
+}
 
 /// Console log format for the fmt layer. Selected by `KOPIUR_LOG_FORMAT`.
 ///
@@ -104,9 +165,47 @@ pub fn init_tracing(service_name: &str) -> Result<TelemetryGuard, TelemetryError
     }
     let ansi = std::io::stdout().is_terminal();
 
+    let otlp = match OtlpConfig::from_env() {
+        Ok(o) => o,
+        Err(e) => {
+            deferred.push(format!("OTLP config is invalid; OTLP export is off: {e}"));
+            None
+        }
+    };
+
+    let mut tracer_provider = None;
+    let mut logger_provider = None;
     let mut otel_layers: Vec<BoxedLayer> = Vec::new();
 
+    if let Some(cfg) = otlp.as_ref() {
+        match build_trace_provider(service_name, cfg) {
+            Ok(tp) => {
+                let tracer = tp.tracer("kopiur");
+                otel_layers.push(tracing_opentelemetry::layer().with_tracer(tracer).boxed());
+                tracer_provider = Some(tp);
+            }
+            Err(e) => deferred.push(format!("OTLP trace export disabled: {e}")),
+        }
+        match build_log_provider(service_name, cfg) {
+            Ok(lp) => {
+                otel_layers.push(
+                    opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge::new(&lp)
+                        .boxed(),
+                );
+                logger_provider = Some(lp);
+            }
+            Err(e) => deferred.push(format!("OTLP log export disabled: {e}")),
+        }
+    }
+
     let layers = build_layers(log_format, std::io::stdout, ansi, otel_layers);
+
+    if INITIALIZED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return Ok(TelemetryGuard {
+            tracer_provider,
+            logger_provider,
+        });
+    }
 
     if let Err(e) = tracing_subscriber::registry()
         .with(layers)
@@ -126,7 +225,47 @@ pub fn init_tracing(service_name: &str) -> Result<TelemetryGuard, TelemetryError
     }
 
     Ok(TelemetryGuard {
-        tracer_provider: None,
-        logger_provider: None,
+        tracer_provider,
+        logger_provider,
     })
+}
+
+/// Set the first time [`init_tracing`] attempts to install the global subscriber,
+/// so subsequent calls in the same process are no-ops (test binaries init twice).
+static INITIALIZED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn build_trace_provider(
+    service_name: &str,
+    cfg: &OtlpConfig,
+) -> Result<SdkTracerProvider, TelemetryError> {
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(cfg.endpoint.clone())
+        .build()
+        .map_err(|e| TelemetryError::ExporterBuild {
+            signal: Signal::Traces,
+            source: Box::new(e),
+        })?;
+    Ok(SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(resource(service_name))
+        .build())
+}
+
+fn build_log_provider(
+    service_name: &str,
+    cfg: &OtlpConfig,
+) -> Result<SdkLoggerProvider, TelemetryError> {
+    let exporter = opentelemetry_otlp::LogExporter::builder()
+        .with_tonic()
+        .with_endpoint(cfg.endpoint.clone())
+        .build()
+        .map_err(|e| TelemetryError::ExporterBuild {
+            signal: Signal::Logs,
+            source: Box::new(e),
+        })?;
+    Ok(SdkLoggerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(resource(service_name))
+        .build())
 }
