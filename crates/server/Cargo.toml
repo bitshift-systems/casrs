@@ -12,6 +12,7 @@ name = "casrs-server"
 path = "src/main.rs"
 
 [dependencies]
+axum.workspace = true
 casrs-telemetry.workspace = true
 clap.workspace = true
 tracing.workspace = true

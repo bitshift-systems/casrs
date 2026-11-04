@@ -14,6 +14,7 @@ authors = ["casrs contributors"]
 casrs-api = { path = "crates/api" }
 casrs-telemetry = { path = "crates/telemetry" }
 
+axum = { version = "0.8", features = ["macros"] }
 clap = { version = "4.6", features = ["derive", "env"] }
 thiserror = "2.0"
 tokio = "1.54"
