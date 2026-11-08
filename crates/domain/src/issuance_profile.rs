@@ -1,7 +1,7 @@
 use std::time;
 
 use crate::{
-    policy::SubjectPolicy,
+    policy::{SanPolicy, SubjectPolicy},
     uuid::{FamilyId, IssuanceProfileId},
 };
 
@@ -40,11 +40,4 @@ pub enum ExtendedKeyUsage {
     EmailProtection,
     TimeStamping,
     OCSPSigning,
-}
-
-pub struct SanPolicy {
-    pub dns_names: Vec<String>,
-    pub ip_addresses: Vec<String>,
-    pub email_addresses: Vec<String>,
-    pub uris: Vec<String>,
 }
