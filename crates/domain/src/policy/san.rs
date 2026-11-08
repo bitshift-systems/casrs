@@ -95,6 +95,9 @@ pub enum SanRuleError {
         "Email domain name does not match the expected domain. Expected: {expected}, found: {found}"
     )]
     EmailDomainMismatch { expected: String, found: String },
+
+    #[error("Email address {0} is malformed.")]
+    EmailMalformed(String),
 }
 
 impl SanRule {
@@ -144,8 +147,8 @@ impl SanRule {
 
             Self::EmailDomain { domain, scope } => {
                 let parts: Vec<&str> = input.split('@').collect();
-                if parts.len() != 2 {
-                    panic!("FIXME!!! Invalid email address: {input:?}");
+                if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+                    return Err(SanRuleError::EmailMalformed(input.to_string()));
                 }
                 let input = DnsName::new(parts[1])?;
 
@@ -182,6 +185,9 @@ mod test {
     #[test_case(SanRule::EmailExact("jdoe@example.com".to_string()), "jappleseed@example.com", Some(SanRuleError::EmailExactMismatch { expected: "jdoe@example.com".to_string(), found: "jappleseed@example.com".to_string() }) ; "email exact mismatch")]
     #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::Exact }, "jdoe@example.com", None ; "email domain exact match")]
     #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::Exact }, "jdoe@hello.example.com", Some(SanRuleError::EmailDomainMismatch { expected: "example.com".to_string(), found: "hello.example.com".to_string() }) ; "email domain exact mismatch")]
+    #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::Exact }, "invalid", Some(SanRuleError::EmailMalformed("invalid".into())) ; "email malformed")]
+    #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::Exact }, "jdoe@", Some(SanRuleError::EmailMalformed("jdoe@".into())) ; "email has no domain")]
+    #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::Exact }, "@example.com", Some(SanRuleError::EmailMalformed("@example.com".into())) ; "email has no local part")]
     #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::ExactAndSubdomains }, "jdoe@example.com", None ; "email domain exact and subdomains match")]
     #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::ExactAndSubdomains }, "jdoe@hello.example.com", None ; "email domain exact and subdomains match with subdomain")]
     #[test_case(SanRule::EmailDomain { domain: DnsName::new("example.com").unwrap(), scope: DomainScope::ExactAndSubdomains }, "jdoe@a.hello.example.com", None ; "email domain exact and subdomains match with deep subdomain")]
