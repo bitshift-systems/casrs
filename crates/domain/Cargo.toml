@@ -8,6 +8,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+idna.workspace = true
 ipnet.workspace = true
 thiserror.workspace = true
 uuid.workspace = true

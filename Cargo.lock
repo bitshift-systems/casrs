@@ -199,6 +199,7 @@ dependencies = [
 name = "casrs-domain"
 version = "0.1.0"
 dependencies = [
+ "idna",
  "ipnet",
  "test-case",
  "thiserror 2.0.21",

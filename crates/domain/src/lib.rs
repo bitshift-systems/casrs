@@ -2,6 +2,7 @@
 
 pub mod authority;
 pub mod certificate;
+pub mod dns_name;
 pub mod error;
 pub mod family;
 pub mod issuance_profile;
