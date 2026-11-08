@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DistinguishedName {
     pub common_name: Option<String>,
@@ -6,6 +8,33 @@ pub struct DistinguishedName {
     pub locality: Option<String>,
     pub state_or_province: Option<String>,
     pub country: Option<String>,
+}
+
+impl Display for DistinguishedName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut parts = Vec::new();
+
+        if let Some(ref cn) = self.common_name {
+            parts.push(format!("CN={}", cn));
+        }
+        if let Some(ref o) = self.organization {
+            parts.push(format!("O={}", o));
+        }
+        if let Some(ref ou) = self.organizational_unit {
+            parts.push(format!("OU={}", ou));
+        }
+        if let Some(ref l) = self.locality {
+            parts.push(format!("L={}", l));
+        }
+        if let Some(ref st) = self.state_or_province {
+            parts.push(format!("ST={}", st));
+        }
+        if let Some(ref c) = self.country {
+            parts.push(format!("C={}", c));
+        }
+
+        write!(f, "{}", parts.join(","))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -123,10 +152,7 @@ pub enum SubjectPolicyError {
     #[error(
         "Subject policy requires a fixed subject, but the provided subject does not match. Expected: {expected:?}, Found: {found:?}"
     )]
-    FixedSubjectMismatch {
-        expected: DistinguishedName,
-        found: DistinguishedName,
-    },
+    FixedSubjectMismatch { expected: String, found: String },
 
     #[error("Subject policy constraint violation for attribute '{attribute}': {error:?}")]
     ConstraintViolation {
@@ -153,8 +179,8 @@ impl SubjectPolicy {
             SubjectPolicy::Fixed(fixed) => {
                 if subject != fixed {
                     return Err(SubjectPolicyError::FixedSubjectMismatch {
-                        expected: fixed.clone(),
-                        found: subject.clone(),
+                        expected: fixed.to_string(),
+                        found: subject.to_string(),
                     });
                 }
             }
@@ -226,7 +252,7 @@ mod test {
     #[test_case(ValueRule::OneOf(vec!["Value1".to_string(), "Value2".to_string()]), "Value1", None ; "when value is in allowed set")]
     #[test_case(ValueRule::OneOf(vec!["Value1".to_string(), "Value2".to_string()]), "Value3", Some(ValueRuleError::NotInAllowedSet { allowed: vec!["Value1".to_string(), "Value2".to_string()], found: "Value3".to_string() }) ; "when value is not in allowed set")]
     fn test_value_rule_validation(rule: ValueRule, input: &str, expected: Option<ValueRuleError>) {
-        let result = rule.validate(&input);
+        let result = rule.validate(input);
         if let Some(expected) = expected {
             assert!(result.is_err(), "expected error {:?}, but got Ok", expected);
             let err = result.unwrap_err();
@@ -269,7 +295,7 @@ mod test {
     #[test_case(SubjectPolicy::Empty, DistinguishedName { common_name: None, organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }, None ; "when empty subject is valid")]
     #[test_case(SubjectPolicy::Empty, DistinguishedName { common_name: Some("CN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }, Some(SubjectPolicyError::EmptySubjectProvided) ; "when non-empty subject is invalid")]
     #[test_case(SubjectPolicy::Fixed(DistinguishedName { common_name: Some("CN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }), DistinguishedName { common_name: Some("CN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }, None ; "when fixed subject matches")]
-    #[test_case(SubjectPolicy::Fixed(DistinguishedName { common_name: Some("CN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }), DistinguishedName { common_name: Some("WrongCN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }, Some(SubjectPolicyError::FixedSubjectMismatch { expected: DistinguishedName { common_name: Some("CN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }, found: DistinguishedName { common_name: Some("WrongCN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None } }) ; "when fixed subject does not match")]
+    #[test_case(SubjectPolicy::Fixed(DistinguishedName { common_name: Some("CN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }), DistinguishedName { common_name: Some("WrongCN".into()), organization: None, organizational_unit: None, locality: None, state_or_province: None, country: None }, Some(SubjectPolicyError::FixedSubjectMismatch { expected: "CN=CN".into(), found: "CN=WrongCN".into() }) ; "when fixed subject does not match")]
     #[test_case(SubjectPolicy::Requested(SubjectConstraints { common_name: AttributeRule::Required(ValueRule::AnyNonEmpty), organization: AttributeRule::Optional(ValueRule::AnyNonEmpty), organizational_unit: AttributeRule::Forbidden, locality: AttributeRule::Optional(ValueRule::AnyNonEmpty), state_or_province: AttributeRule::Optional(ValueRule::AnyNonEmpty), country: AttributeRule::Optional(ValueRule::AnyNonEmpty) }), DistinguishedName { common_name: Some("CN".into()), organization: Some("Org".into()), organizational_unit: None, locality: None, state_or_province: None, country: None }, None ; "when requested subject is valid")]
     #[test_case(SubjectPolicy::Requested(SubjectConstraints { common_name: AttributeRule::Required(ValueRule::AnyNonEmpty), organization: AttributeRule::Optional(ValueRule::AnyNonEmpty), organizational_unit: AttributeRule::Forbidden, locality: AttributeRule::Optional(ValueRule::AnyNonEmpty), state_or_province: AttributeRule::Optional(ValueRule::AnyNonEmpty), country: AttributeRule::Optional(ValueRule::AnyNonEmpty) }), DistinguishedName { common_name: None, organization: Some("Org".into()), organizational_unit: None, locality: None, state_or_province: None, country: None }, Some(SubjectPolicyError::ConstraintViolation { attribute: "common_name".to_string(), error: AttributeRuleError::RequiredMissing }) ; "when requested subject is invalid")]
     #[test_case(SubjectPolicy::Empty, DistinguishedName { common_name: None, organization: None, organizational_unit: Some("OU".into()), locality: None, state_or_province: None, country: None }, Some(SubjectPolicyError::EmptySubjectProvided) ; "when only organizational unit is present")]

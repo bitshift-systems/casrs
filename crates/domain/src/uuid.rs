@@ -16,6 +16,12 @@ macro_rules! define_id {
                 Self(Uuid::now_v7())
             }
         }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
     }
 }
 
