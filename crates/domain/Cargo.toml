@@ -8,4 +8,9 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+ipnet.workspace = true
+thiserror.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+test-case.workspace = true

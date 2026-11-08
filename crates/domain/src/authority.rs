@@ -30,7 +30,7 @@ impl Authority {
         policy: AuthorityPolicy,
     ) -> Result<Authority, DomainError> {
         if self.status != AuthorityStatus::Enabled {
-            return Err(DomainError::AuthorityNotEnabled);
+            return Err(DomainError::AuthorityDisabled);
         }
 
         if !self.policy.can_issue_subordinate_cas {
@@ -49,6 +49,7 @@ impl Authority {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthorityStatus {
     Enabled,
     Disabled,
@@ -76,6 +77,7 @@ pub struct AuthorityVersion {
     pub activated_at: Option<time::SystemTime>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthorityVersionStatus {
     Pending,
     Ready,

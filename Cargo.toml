@@ -27,8 +27,10 @@ casrs-domain = { path = "crates/domain" }
 casrs-telemetry = { path = "crates/telemetry" }
 
 axum = { version = "0.8", features = ["macros"] }
+ipnet = "2.12"
 async-trait = "0.1"
 clap = { version = "4.6", features = ["derive", "env"] }
+test-case = "3.4"
 thiserror = "2.0"
 tokio = "1.54"
 tracing = "0.1"

@@ -18,3 +18,10 @@ pub struct SignRequest<'a> {
     pub algorithm: SignatureAlgorithm,
     pub message: &'a [u8],
 }
+
+pub enum SignatureAlgorithm {
+    RsaPkcs1v15Sha256,
+    RsaPssSha256,
+    EcdsaP256Sha256,
+    Ed25519,
+}

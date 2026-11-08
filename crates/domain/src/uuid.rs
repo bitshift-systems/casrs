@@ -38,3 +38,8 @@ define_id!(
     /// A unique identifier for a [Certificate](crate::certificate::Certificate).
     pub CertificateId
 );
+
+define_id!(
+    /// A unique identifier for a [IssuanceProfile](crate::issuance_profile::IssuanceProfile).
+    pub IssuanceProfileId
+);
