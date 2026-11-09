@@ -7,9 +7,9 @@ use crate::dns_name::{DnsName, DnsNameError};
 /// A Subject Alternative Name (SAN) that can be included in a certificate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubjectAltName {
-    DnsName(String),
+    DnsName(DnsName),
     IpAddress(IpAddr),
-    Rfc822Name(String),
+    Email(String),
     Uri(String),
 }
 
@@ -19,6 +19,47 @@ pub enum SanPolicy {
     None,
     Fixed(Vec<SubjectAltName>),
     Requested(SanConstraints),
+}
+
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum SanPolicyError {
+    #[error("SANs are not allowed with this policy")]
+    NoneNotAllowed,
+    #[error("SAN {:?} is not allowed with this policy", .0)]
+    FixedNotAllowed(SubjectAltName),
+    #[error(transparent)]
+    RuleViolation(#[from] SanRuleError),
+}
+
+impl SanPolicy {
+    pub fn validate(&self, san: &SubjectAltName) -> Result<(), SanPolicyError> {
+        match self {
+            SanPolicy::None => {
+                return Err(SanPolicyError::NoneNotAllowed);
+            }
+
+            SanPolicy::Fixed(fixed_sans) => {
+                if !fixed_sans.contains(san) {
+                    return Err(SanPolicyError::FixedNotAllowed(san.clone()));
+                }
+            }
+
+            SanPolicy::Requested(constraints) => {
+                let san_str = match san {
+                    SubjectAltName::DnsName(name) => &name.to_string(),
+                    SubjectAltName::IpAddress(ip) => &ip.to_string(),
+                    SubjectAltName::Email(email) => email,
+                    SubjectAltName::Uri(uri) => uri,
+                };
+
+                for rule in &constraints.allowed {
+                    rule.validate(san_str)?;
+                }
+            }
+        };
+
+        Ok(())
+    }
 }
 
 /// Constraints for validating requested Subject Alternative Names (SANs) in a certificate request.
