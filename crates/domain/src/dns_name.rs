@@ -1,8 +1,10 @@
 use std::{fmt, net::IpAddr, str::FromStr};
 
+/// A validated DNS name that can be used in a certificate SAN.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DnsName(String);
 
+/// Errors that can occur when validating a DNS name.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum DnsNameError {
     #[error("DNS name cannot be empty")]
@@ -22,6 +24,7 @@ pub enum DnsNameError {
 }
 
 impl DnsName {
+    /// Creates a new validated DNS name from the given input string.
     pub fn new(input: &str) -> Result<Self, DnsNameError> {
         // Accept fully qualified names ending with a dot.
         let input = input.strip_suffix('.').unwrap_or(input);

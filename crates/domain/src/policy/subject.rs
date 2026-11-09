@@ -1,5 +1,7 @@
 use std::fmt::{self, Display};
 
+/// A distinguished name (DN) as defined in [RFC 5280 section
+/// 4.1](https://www.rfc-editor.org/info/rfc5280/#section-4.1).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DistinguishedName {
     pub common_name: Option<String>,

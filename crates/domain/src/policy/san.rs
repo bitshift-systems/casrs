@@ -4,6 +4,7 @@ use ipnet::IpNet;
 
 use crate::dns_name::{DnsName, DnsNameError};
 
+/// A Subject Alternative Name (SAN) that can be included in a certificate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubjectAltName {
     DnsName(String),
@@ -12,6 +13,7 @@ pub enum SubjectAltName {
     Uri(String),
 }
 
+/// A policy for validating Subject Alternative Names (SANs) in a certificate request.
 #[derive(Debug, Clone)]
 pub enum SanPolicy {
     None,
@@ -19,6 +21,7 @@ pub enum SanPolicy {
     Requested(SanConstraints),
 }
 
+/// Constraints for validating requested Subject Alternative Names (SANs) in a certificate request.
 #[derive(Debug, Clone)]
 pub struct SanConstraints {
     pub min_names: usize,
@@ -30,10 +33,14 @@ pub struct SanConstraints {
     pub allowed: Vec<SanRule>,
 }
 
+/// The scope of a domain match for SAN validation.
 #[derive(Debug, Clone)]
 pub enum DomainScope {
+    /// The domain must match exactly.
     Exact,
+    /// The domain must be a subdomain of the expected domain, but not equal to it.
     SubdomainsOnly,
+    /// The domain must match exactly or be a subdomain of the expected domain.
     ExactAndSubdomains,
 }
 
@@ -47,6 +54,8 @@ impl DomainScope {
     }
 }
 
+/// A rule for validating a requested Subject Alternative Name (SAN) in a
+/// certificate request.
 #[derive(Debug, Clone)]
 pub enum SanRule {
     DnsExact(DnsName),
