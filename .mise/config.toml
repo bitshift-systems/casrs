@@ -1,5 +1,5 @@
 [tools]
-rust = "1.99.1"
+rust = "1.100.0"
 hk = { version = "2.12.0", workflow = "release.yml" }
 oxfmt = "0.75.0"
 jactionlint = "v2.5.0"
