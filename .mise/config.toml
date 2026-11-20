@@ -5,7 +5,7 @@ oxfmt = "0.75.0"
 jactionlint = "v2.6.0"
 shellcheck = "0.11.0"
 
-"aqua:EmbarkStudios/cargo-deny" = "0.20.2"
+"aqua:EmbarkStudios/cargo-deny" = "0.21.0"
 "aqua:nextest-rs/nextest/cargo-nextest" = "0.9.146"
 "packslip:jdx/jactionlint" = "2.4.0"
 
